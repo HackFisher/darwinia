@@ -2,40 +2,6 @@
 cli = { package = "node-cli", path = "node/cli" }
 futures = "0.1"
 ctrlc = { version = "3.0", features = ["termination"] }
-substrate-cli = { git = 'https://github.com/paritytech/substrate.git' }
-substrate-client = { git = 'https://github.com/paritytech/substrate.git' }
-substrate-client-db = { git = 'https://github.com/paritytech/substrate.git' }
-substrate-consensus-aura = { git = 'https://github.com/paritytech/substrate.git' }
-substrate-consensus-babe = { git = 'https://github.com/paritytech/substrate.git' }
-substrate-consensus-common = { git = 'https://github.com/paritytech/substrate.git' }
-substrate-consensus-rhd = { git = 'https://github.com/paritytech/substrate.git' }
-substrate-consensus-slots = { git = 'https://github.com/paritytech/substrate.git' }
-substrate-executor = { git = 'https://github.com/paritytech/substrate.git' }
-substrate-finality-grandpa = { git = 'https://github.com/paritytech/substrate.git' }
-substrate-finality-grandpa-primitives = { git = 'https://github.com/paritytech/substrate.git' }
-substrate-inherents = { git = 'https://github.com/paritytech/substrate.git' }
-substrate-keyring = { git = 'https://github.com/paritytech/substrate.git' }
-substrate-keystore = { git = 'https://github.com/paritytech/substrate.git' }
-substrate-network = { git = 'https://github.com/paritytech/substrate.git' }
-substrate-panic-handler = { git = 'https://github.com/paritytech/substrate.git' }
-substrate-primitives = { git = 'https://github.com/paritytech/substrate.git' }
-substrate-rpc = { git = 'https://github.com/paritytech/substrate.git' }
-substrate-rpc-servers = { git = 'https://github.com/paritytech/substrate.git' }
-substrate-serializer = { git = 'https://github.com/paritytech/substrate.git' }
-substrate-service = { git = 'https://github.com/paritytech/substrate.git' }
-substrate-service-test = { git = 'https://github.com/paritytech/substrate.git' }
-sr-api-macros = { git = 'https://github.com/paritytech/substrate.git' }
-sr-io = { git = 'https://github.com/paritytech/substrate.git' }
-sr-primitives = { git = 'https://github.com/paritytech/substrate.git' }
-sr-sandbox = { git = 'https://github.com/paritytech/substrate.git' }
-sr-std = { git = 'https://github.com/paritytech/substrate.git' }
-sr-version = { git = 'https://github.com/paritytech/substrate.git' }
-substrate-state-machine = { git = 'https://github.com/paritytech/substrate.git' }
-substrate-telemetry = { git = 'https://github.com/paritytech/substrate.git' }
-substrate-transaction-pool = { git = 'https://github.com/paritytech/substrate.git' }
-substrate-transaction-graph = { git = 'https://github.com/paritytech/substrate.git' }
-substrate-trie = { git = 'https://github.com/paritytech/substrate.git' }
-fork-tree = { git = 'https://github.com/paritytech/substrate.git' }
 
 
 [build-dependencies]
@@ -50,7 +16,6 @@ path = 'node/src/main.rs'
 
 [workspace]
 members = [
-#    "darwinia-client",
 	"node/cli",
     "node/executor",
     "node/primitives",
@@ -59,7 +24,6 @@ members = [
     "srml/staking",
     "srml/kton",
     "srml/support",
-    "srml/aura",
 	"srml/try",
 ]
 

@@ -26,15 +26,17 @@ extern crate test;
 #[cfg(feature = "std")]
 use runtime_io::with_storage;
 use rstd::{prelude::*, result, collections::btree_map::BTreeMap};
-use parity_codec::{HasCompact, Encode, Decode, CompactAs};
-use srml_support::{
-    StorageValue, StorageMap, EnumerableStorageMap, decl_module, decl_event,
-    decl_storage, ensure, traits::{
-        Currency, OnFreeBalanceZero, LockIdentifier, LockableCurrency,
-        WithdrawReasons, WithdrawReason, OnUnbalanced, Imbalance, Get,
-    },
+
+use codec::{HasCompact, Encode, Decode};
+
+use support::{
+    decl_module, decl_event, decl_storage, ensure,
+    traits::{
+        Currency, OnFreeBalanceZero, OnDilution, LockIdentifier, LockableCurrency,
+        WithdrawReasons, WithdrawReason, OnUnbalanced, Imbalance, Get, Time
+    }
 };
-use session::{OnSessionEnding, SessionIndex};
+use session::{historical::OnSessionEnding, SelectInitialValidators};
 use primitives::Perbill;
 use primitives::traits::{Convert,
                          Zero, One, StaticLookup, CheckedShl, CheckedSub, Saturating, Bounded, SaturatedConversion,
@@ -45,6 +47,11 @@ use system::ensure_signed;
 
 use rstd::convert::TryInto;
 use phragmen::{ACCURACY, elect, equalize, ExtendedBalance};
+
+use sr_staking_primitives::{
+    SessionIndex,
+    offence::{OnOffenceHandler, OffenceDetails, Offence, ReportOffence},
+};
 
 
 mod utils;
@@ -81,22 +88,20 @@ pub enum StakerStatus<AccountId> {
     Nominator(Vec<AccountId>),
 }
 
+/// Preference of what happens on a slash event.
 #[derive(PartialEq, Eq, Clone, Encode, Decode)]
 #[cfg_attr(feature = "std", derive(Debug))]
-pub struct ValidatorPrefs {
-    /// Validator should ensure this many more slashes than is necessary before being unstaked.
-    #[codec(compact)]
-    pub unstake_threshold: u32,
-    /// percent of Reward that validator takes up-front; only the rest is split between themselves and
+pub struct ValidatorPrefs<Balance: HasCompact> {
+    /// Reward that validator takes up-front; only the rest is split between themselves and
     /// nominators.
-    pub validator_payment_ratio: Perbill,
+    #[codec(compact)]
+    pub validator_payment: Balance,
 }
 
-impl Default for ValidatorPrefs {
+impl<B: Default + HasCompact + Copy> Default for ValidatorPrefs<B> {
     fn default() -> Self {
         ValidatorPrefs {
-            unstake_threshold: 3,
-            validator_payment_ratio: Default::default(),
+            validator_payment: Default::default(),
         }
     }
 }
@@ -269,7 +274,7 @@ pub struct IndividualExpo<AccountId, Power> {
 /// A snapshot of the stake backing a single validator in the system.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Debug))]
-pub struct Exposures<AccountId, Power> {
+pub struct Exposure<AccountId, Power> {
     /// The total balance backing this validator.
     pub total: Power,
     /// The validator's own stash that is exposed.
@@ -298,7 +303,7 @@ type RawAssignment<T> = (<T as system::Trait>::AccountId, ExtendedBalance);
 type Assignment<T> = (<T as system::Trait>::AccountId, ExtendedBalance, ExtendedBalance);
 type ExpoMap<T> = BTreeMap<
     <T as system::Trait>::AccountId,
-    Exposures<<T as system::Trait>::AccountId, ExtendedBalance>
+    Exposure<<T as system::Trait>::AccountId, ExtendedBalance>
 >;
 
 
@@ -355,11 +360,11 @@ decl_storage! {
 
 		pub Payee get(payee): map T::AccountId => RewardDestination;
 
-		pub Validators get(validators): linked_map T::AccountId => ValidatorPrefs;
+		pub Validators get(validators): linked_map T::AccountId => ValidatorPrefs<RingBalanceOf<T>>;
 
 		pub Nominators get(nominators): linked_map T::AccountId => Vec<T::AccountId>;
 
-		pub Stakers get(stakers): map T::AccountId => Exposures<T::AccountId, ExtendedBalance>;
+		pub Stakers get(stakers): map T::AccountId => Exposure<T::AccountId, ExtendedBalance>;
 
 		pub CurrentElected get(current_elected): Vec<T::AccountId>;
 
@@ -388,43 +393,33 @@ decl_storage! {
     add_extra_genesis {
 		config(stakers):
 			Vec<(T::AccountId, T::AccountId, RingBalanceOf<T>, StakerStatus<T::AccountId>)>;
-		build(|
-			storage: &mut primitives::StorageOverlay,
-			_: &mut primitives::ChildrenStorageOverlay,
-			config: &GenesisConfig<T>
-		| {
-			with_storage(storage, || {
-				for &(ref stash, ref controller, balance, ref status) in &config.stakers {
-					assert!(T::Ring::free_balance(&stash) >= balance);
-					let _ = <Module<T>>::bond(
-						T::Origin::from(Some(stash.clone()).into()),
-						T::Lookup::unlookup(controller.clone()),
-						StakingBalance::Ring(balance),
-						RewardDestination::Stash,
-						12
-					);
-					let _ = match status {
-						StakerStatus::Validator => {
-							<Module<T>>::validate(
-								T::Origin::from(Some(controller.clone()).into()),
-								[0;8].to_vec(),
-								0,
-								3
-							)
-						},
-						StakerStatus::Nominator(votes) => {
-							<Module<T>>::nominate(
-								T::Origin::from(Some(controller.clone()).into()),
-								votes.iter().map(|l| {T::Lookup::unlookup(l.clone())}).collect()
-							)
-						}, _ => Ok(())
-					};
-				}
-
-				if let (_, Some(validators)) = <Module<T>>::select_validators() {
-					<session::Validators<T>>::put(&validators);
-				}
-			});
+		build(|config: &GenesisConfig<T>| {
+			for &(ref stash, ref controller, balance, ref status) in &config.stakers {
+				assert!(
+					T::Currency::free_balance(&stash) >= balance,
+					"Stash does not have enough balance to bond."
+				);
+				let _ = <Module<T>>::bond(
+					T::Origin::from(Some(stash.clone()).into()),
+					T::Lookup::unlookup(controller.clone()),
+					balance,
+					RewardDestination::Staked,
+				);
+				let _ = match status {
+					StakerStatus::Validator => {
+						<Module<T>>::validate(
+							T::Origin::from(Some(controller.clone()).into()),
+							Default::default(),
+						)
+					},
+					StakerStatus::Nominator(votes) => {
+						<Module<T>>::nominate(
+							T::Origin::from(Some(controller.clone()).into()),
+							votes.iter().map(|l| T::Lookup::unlookup(l.clone())).collect(),
+						)
+					}, _ => Ok(())
+				};
+			}
 		});
 	}
 }
@@ -451,7 +446,7 @@ decl_module! {
 		/// Number of eras that staked funds must remain bonded for.
 		const BondingDuration: EraIndex = T::BondingDuration::get();
 
-		fn deposit_event<T>() = default;
+		fn deposit_event() = default;
 
         fn bond(origin,
             controller: <T::Lookup as StaticLookup>::Source,
@@ -736,24 +731,12 @@ decl_module! {
             }
         }
 
-        fn validate(origin, name: Vec<u8>, ratio: u32, unstake_threshold: u32) {
+		fn validate(origin, prefs: ValidatorPrefs<RingBalanceOf<T>>) {
 			let controller = ensure_signed(origin)?;
 			let ledger = Self::ledger(&controller).ok_or("not a controller")?;
 			let stash = &ledger.stash;
-			ensure!(
-				unstake_threshold <= MAX_UNSTAKE_THRESHOLD,
-				"unstake threshold too large"
-			);
-            // at most 100%
-            let ratio = Perbill::from_percent(ratio.min(100));
-            let prefs = ValidatorPrefs {unstake_threshold: unstake_threshold, validator_payment_ratio: ratio };
-
 			<Nominators<T>>::remove(stash);
 			<Validators<T>>::insert(stash, prefs);
-			if !<NodeName<T>>::exists(&controller) {
-			    <NodeName<T>>::insert(controller, name);
-			    Self::deposit_event(RawEvent::NodeNameUpdated);
-			}
 		}
 
 		fn nominate(origin, targets: Vec<<T::Lookup as StaticLookup>::Source>) {
@@ -801,23 +784,23 @@ decl_module! {
 		}
 
 		/// The ideal number of validators.
-		fn set_validator_count(#[compact] new: u32) {
+		fn set_validator_count(origin, #[compact] new: u32) {
 			ValidatorCount::put(new);
 		}
 
 		// ----- Root calls.
 
-		fn force_new_era() {
+		fn force_new_era(origin) {
 			Self::apply_force_new_era()
 		}
 
 		/// Set the offline slash grace period.
-		fn set_offline_slash_grace(#[compact] new: u32) {
+		fn set_offline_slash_grace(origin, #[compact] new: u32) {
 			OfflineSlashGrace::put(new);
 		}
 
 		/// Set the validators who cannot be slashed (if any).
-		fn set_invulnerables(validators: Vec<T::AccountId>) {
+		fn set_invulnerables(origin, validators: Vec<T::AccountId>) {
 			<Invulnerables<T>>::put(validators);
 		}
     }
@@ -1133,7 +1116,7 @@ impl<T: Trait> Module<T> {
 
 
     fn reward_validator(stash: &T::AccountId, reward: RingBalanceOf<T>) {
-        let off_the_table = Self::validators(stash).validator_payment_ratio * reward;
+        let off_the_table = reward.min(Self::validators(stash).validator_payment);
         let reward = reward - off_the_table;
         let mut imbalance = <RingPositiveImbalanceOf<T>>::zero();
         let validator_cut = if reward.is_zero() {
@@ -1219,7 +1202,7 @@ impl<T: Trait> Module<T> {
                 .iter()
                 .map(|e| (e, Self::slashable_balance_of(e)))
                 .for_each(|(e, s)| {
-                    let item = Exposures { own: s, total: s, ..Default::default() };
+                    let item = Exposure { own: s, total: s, ..Default::default() };
                     exposures.insert(e.clone(), item);
                 });
 
@@ -1373,12 +1356,19 @@ impl<T: Trait> Module<T> {
 }
 
 
-impl<T: Trait> OnSessionEnding<T::AccountId> for Module<T> {
-    fn on_session_ending(i: SessionIndex) -> Option<Vec<T::AccountId>> {
-        Self::new_session(i + 1)
+impl<T: Trait> session::OnSessionEnding<T::AccountId> for Module<T> {
+    fn on_session_ending(_ending: SessionIndex, start_session: SessionIndex) -> Option<Vec<T::AccountId>> {
+        Self::new_session(start_session - 1).map(|(new, _old)| new)
     }
 }
 
+impl<T: Trait> OnSessionEnding<T::AccountId, Exposure<T::AccountId, StakingBalance<RingBalanceOf<T>, KtonBalanceOf<T>>>> for Module<T> {
+    fn on_session_ending(_ending: SessionIndex, start_session: SessionIndex)
+                         -> Option<(Vec<T::AccountId>, Vec<(T::AccountId, Exposure<T::AccountId, StakingBalance<RingBalanceOf<T>, KtonBalanceOf<T>>>)>)>
+    {
+        Self::new_session(start_session - 1)
+    }
+}
 
 impl<T: Trait> OnFreeBalanceZero<T::AccountId> for Module<T> {
     fn on_free_balance_zero(stash: &T::AccountId) {
