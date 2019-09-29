@@ -59,7 +59,7 @@ mod tests {
 	use substrate_executor::{NativeExecutionDispatch, WasmExecutor};
 	use system::{EventRecord, Phase};
 	use wabt;
-	use {balances, contracts, indices, staking, system, timestamp, treasury};
+	use {balances, contracts, indices, ostaking, system, timestamp, treasury};
 
 	/// The wasm runtime code.
 	///
@@ -386,9 +386,9 @@ mod tests {
 					current_era: 0,
 					current_era_total_reward: 1,
 					stakers: vec![
-						(dave(), alice(), 111, staking::StakerStatus::Validator),
-						(eve(), bob(), 100, staking::StakerStatus::Validator),
-						(ferdie(), charlie(), 100, staking::StakerStatus::Validator),
+						(dave(), alice(), 111, ostaking::StakerStatus::Validator),
+						(eve(), bob(), 100, ostaking::StakerStatus::Validator),
+						(ferdie(), charlie(), 100, ostaking::StakerStatus::Validator),
 					],
 					validator_count: 3,
 					minimum_validator_count: 0,

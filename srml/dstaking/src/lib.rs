@@ -25,24 +25,31 @@ extern crate test;
 use parity_codec::{CompactAs, Decode, Encode, HasCompact};
 use primitives::traits::{Bounded, CheckedSub, Convert, One, SaturatedConversion, Saturating, StaticLookup, Zero};
 use primitives::Perbill;
+
+use sr_staking_primitives::{
+	SessionIndex,
+	offence::{OnOffenceHandler, OffenceDetails, Offence, ReportOffence},
+};
+
 #[cfg(feature = "std")]
 use primitives::{Deserialize, Serialize};
 use rstd::{collections::btree_map::BTreeMap, prelude::*, result};
 #[cfg(feature = "std")]
 use runtime_io::with_storage;
 
-use session::{OnSessionEnding, SessionIndex};
+use session::{OnSessionEnding};
 use srml_support::{
 	decl_event, decl_module, decl_storage, ensure,
 	traits::{
 		Currency, Get, Imbalance, LockIdentifier, LockableCurrency, OnFreeBalanceZero, OnUnbalanced, WithdrawReason,
 		WithdrawReasons,
 	},
-	EnumerableStorageMap,
 };
 use system::ensure_signed;
 
-use phragmen::{elect, equalize, ExtendedBalance, ACCURACY};
+use phragmen::{elect, equalize, ExtendedBalance};
+
+pub const ACCURACY: ExtendedBalance = u32::max_value() as ExtendedBalance + 1;
 
 mod utils;
 
@@ -52,8 +59,6 @@ mod mock;
 //
 #[cfg(test)]
 mod tests;
-
-mod phragmen;
 
 //#[cfg(all(feature = "bench", test))]
 //mod benches;
@@ -194,7 +199,7 @@ pub struct IndividualExpo<AccountId, Power> {
 /// A snapshot of the stake backing a single validator in the system.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Debug))]
-pub struct Exposures<AccountId, Power> {
+pub struct Exposure<AccountId, Power> {
 	/// The total balance backing this validator.
 	pub total: Power,
 	/// The validator's own stash that is exposed.
@@ -217,7 +222,7 @@ type KtonNegativeImbalanceOf<T> = <<T as Trait>::Kton as Currency<<T as system::
 type RawAssignment<T> = (<T as system::Trait>::AccountId, ExtendedBalance);
 type Assignment<T> = (<T as system::Trait>::AccountId, ExtendedBalance, ExtendedBalance);
 type ExpoMap<T> =
-BTreeMap<<T as system::Trait>::AccountId, Exposures<<T as system::Trait>::AccountId, ExtendedBalance>>;
+BTreeMap<<T as system::Trait>::AccountId, Exposure<<T as system::Trait>::AccountId, ExtendedBalance>>;
 
 pub trait Trait: timestamp::Trait + session::Trait {
 	type Ring: LockableCurrency<Self::AccountId, Moment = Self::BlockNumber>;
@@ -251,7 +256,7 @@ pub trait Trait: timestamp::Trait + session::Trait {
 }
 
 decl_storage! {
-	trait Store for Module<T: Trait> as Staking {
+	trait Store for Module<T: Trait> as DStaking {
 
 		pub ValidatorCount get(validator_count) config(): u32;
 
@@ -274,7 +279,7 @@ decl_storage! {
 
 		pub Payee get(payee): map T::AccountId => RewardDestination;
 
-		pub Validators get(validators): linked_map T::AccountId => ValidatorPrefs<RingBalanceOf<T>>;
+		pub Validators get(validators): linked_map T::AccountId => ValidatorPrefs;
 
 		pub Nominators get(nominators): linked_map T::AccountId => Vec<T::AccountId>;
 
@@ -1125,13 +1130,10 @@ impl<T: Trait> Module<T> {
 	// TODO: ready for hacking
 	// power is a mixture of ring and kton
 	fn slashable_balance_of(stash: &T::AccountId) -> ExtendedBalance {
-		Self::bonded(stash)
-			.and_then(Self::ledger)
-			.map(|l| {
-				l.active_ring.saturated_into::<ExtendedBalance>()
-					+ l.active_kton.saturated_into::<ExtendedBalance>() * Self::kton_vote_weight() / ACCURACY
-			})
-			.unwrap_or_default()
+		Self::bonded(stash).and_then(Self::ledger).map(|l| {
+			l.active_ring.saturated_into::<ExtendedBalance>()
+				+ l.active_kton.saturated_into::<ExtendedBalance>() * Self::kton_vote_weight() / ACCURACY
+		}).unwrap_or_default()
 	}
 
 	/// Select a new validator set from the assembled stakers and their role preferences.
@@ -1177,7 +1179,7 @@ impl<T: Trait> Module<T> {
 				.iter()
 				.map(|e| (e, Self::slashable_balance_of(e)))
 				.for_each(|(e, s)| {
-					let item = Exposures {
+					let item = Exposure {
 						own: s,
 						total: s,
 						..Default::default()
@@ -1343,20 +1345,22 @@ impl<T: Trait> Module<T> {
 	}
 }
 
-impl<T: Trait> OnSessionEnding<T::AccountId> for Module<T> {
-	fn on_session_ending(i: SessionIndex) -> Option<Vec<T::AccountId>> {
-		Self::new_session(i + 1)
+impl<T: Trait> session::OnSessionEnding<T::AccountId> for Module<T> {
+	fn on_session_ending(_ending: SessionIndex, start_session: SessionIndex) -> Option<Vec<T::AccountId>> {
+		Self::new_session(start_session - 1).map(|(new, _old)| new)
 	}
 }
 
+//impl<T: Trait> OnSessionEnding<T::AccountId, Exposure<T::AccountId, ExtendedBalance>> for Module<T> {
+//	fn on_session_ending(_ending: SessionIndex, start_session: SessionIndex)
+//						 -> Option<(Vec<T::AccountId>, Vec<(T::AccountId, Exposure<T::AccountId, ExtendedBalance>)>)>
+//	{
+//		Self::new_session(start_session - 1)
+//	}
+//}
+
 impl<T: Trait> OnFreeBalanceZero<T::AccountId> for Module<T> {
 	fn on_free_balance_zero(stash: &T::AccountId) {
-		if let Some(controller) = <Bonded<T>>::take(stash) {
-			<Ledger<T>>::remove(&controller);
-		}
-		<Payee<T>>::remove(stash);
-		<SlashCount<T>>::remove(stash);
-		<Validators<T>>::remove(stash);
-		<Nominators<T>>::remove(stash);
+		Self::kill_stash(stash);
 	}
 }
