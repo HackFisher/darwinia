@@ -23,20 +23,20 @@ extern crate serde;
 
 pub use cli::error;
 pub mod chain_spec;
-mod service;
 mod factory_impl;
 mod panic_handle;
+mod service;
 
-use tokio::prelude::Future;
-use tokio::runtime::{Builder as RuntimeBuilder, Runtime};
-pub use cli::{VersionInfo, IntoExit, NoCustom, SharedParams};
-use substrate_service::{ServiceFactory, Roles as ServiceRoles};
-use std::ops::Deref;
-use log::info;
-use structopt::{StructOpt, clap::App};
-use cli::{AugmentClap, GetLogFilter};
 use crate::factory_impl::FactoryState;
 use crate::panic_handle::set as panic_set;
+use cli::{AugmentClap, GetLogFilter};
+pub use cli::{IntoExit, NoCustom, SharedParams, VersionInfo};
+use log::info;
+use std::ops::Deref;
+use structopt::{clap::App, StructOpt};
+use substrate_service::{Roles as ServiceRoles, ServiceFactory};
+use tokio::prelude::Future;
+use tokio::runtime::{Builder as RuntimeBuilder, Runtime};
 use transaction_factory::RuntimeAdapter;
 
 /// The chain specification option.
@@ -60,9 +60,9 @@ pub enum ChainSpec {
 pub enum CustomSubcommands {
 	/// The custom factory subcommmand for manufacturing transactions.
 	#[structopt(
-	name = "factory",
-	about = "Manufactures num transactions from Alice to random accounts. \
-		Only supported for development or local testnet."
+		name = "factory",
+		about = "Manufactures num transactions from Alice to random accounts. \
+		         Only supported for development or local testnet."
 	)]
 	Factory(FactoryCmd),
 }
@@ -78,7 +78,7 @@ impl GetLogFilter for CustomSubcommands {
 #[derive(Debug, StructOpt, Clone)]
 pub struct FactoryCmd {
 	/// How often to repeat. This option only has an effect in mode `MasterToNToM`.
-	#[structopt(long="rounds", default_value = "1")]
+	#[structopt(long = "rounds", default_value = "1")]
 	pub rounds: u64,
 
 	/// MasterToN: Manufacture `num` transactions from the master account
@@ -98,12 +98,12 @@ pub struct FactoryCmd {
 	///               ... x `rounds`
 	///
 	/// These three modes control manufacturing.
-	#[structopt(long="mode", default_value = "MasterToN")]
+	#[structopt(long = "mode", default_value = "MasterToN")]
 	pub mode: transaction_factory::Mode,
 
 	/// Number of transactions to generate. In mode `MasterNToNToM` this is
 	/// the number of transactions per round.
-	#[structopt(long="num", default_value = "8")]
+	#[structopt(long = "num", default_value = "8")]
 	pub num: u64,
 
 	#[allow(missing_docs)]
@@ -151,13 +151,18 @@ fn load_spec(id: &str) -> Result<Option<chain_spec::ChainSpec>, String> {
 }
 
 /// Parse command line arguments into service configuration.
-pub fn run<I, T, E>(args: I, exit: E, version: cli::VersionInfo) -> error::Result<()> where
+pub fn run<I, T, E>(args: I, exit: E, version: cli::VersionInfo) -> error::Result<()>
+where
 	I: IntoIterator<Item = T>,
 	T: Into<std::ffi::OsString> + Clone,
 	E: IntoExit,
 {
 	let ret = cli::parse_and_execute::<service::Factory, CustomSubcommands, NoCustom, _, _, _, _, _>(
-		load_spec, &version, "substrate-node", args, exit,
+		load_spec,
+		&version,
+		"substrate-node",
+		args,
+		exit,
 		|exit, _cli_args, _custom_args, config| {
 			info!("{}", version.name);
 			info!("  version {}", config.full_version());
@@ -165,61 +170,51 @@ pub fn run<I, T, E>(args: I, exit: E, version: cli::VersionInfo) -> error::Resul
 			info!("Chain specification: {}", config.chain_spec.name());
 			info!("Node name: {}", config.name);
 			info!("Roles: {:?}", config.roles);
-			let runtime = RuntimeBuilder::new().name_prefix("main-tokio-").build()
+			let runtime = RuntimeBuilder::new()
+				.name_prefix("main-tokio-")
+				.build()
 				.map_err(|e| format!("{:?}", e))?;
 			match config.roles {
 				ServiceRoles::LIGHT => run_until_exit(
 					runtime,
 					service::Factory::new_light(config).map_err(|e| format!("{:?}", e))?,
-					exit
+					exit,
 				),
 				_ => run_until_exit(
 					runtime,
 					service::Factory::new_full(config).map_err(|e| format!("{:?}", e))?,
-					exit
+					exit,
 				),
-			}.map_err(|e| format!("{:?}", e))
-		}
+			}
+			.map_err(|e| format!("{:?}", e))
+		},
 	);
 	panic_set(version.support_url);
 	match &ret {
 		Ok(Some(CustomSubcommands::Factory(cli_args))) => {
-			let config = cli::create_config_with_db_path::<service::Factory, _>(
-				load_spec,
-				&cli_args.shared_params,
-				&version,
-			)?;
+			let config =
+				cli::create_config_with_db_path::<service::Factory, _>(load_spec, &cli_args.shared_params, &version)?;
 
 			match ChainSpec::from(config.chain_spec.id()) {
-				Some(ref c) if c == &ChainSpec::Development || c == &ChainSpec::LocalTestnet => {},
+				Some(ref c) if c == &ChainSpec::Development || c == &ChainSpec::LocalTestnet => {}
 				_ => panic!("Factory is only supported for development and local testnet."),
 			}
 
-			let factory_state = FactoryState::new(
-				cli_args.mode.clone(),
-				cli_args.num,
-				cli_args.rounds,
-			);
-			transaction_factory::factory::<service::Factory, FactoryState<_>>(
-				factory_state,
-				config,
-			).map_err(|e| format!("Error in transaction factory: {}", e))?;
+			let factory_state = FactoryState::new(cli_args.mode.clone(), cli_args.num, cli_args.rounds);
+			transaction_factory::factory::<service::Factory, FactoryState<_>>(factory_state, config)
+				.map_err(|e| format!("Error in transaction factory: {}", e))?;
 
 			Ok(())
-		},
-		_ => ret.map_err(Into::into).map(|_| ())
+		}
+		_ => ret.map_err(Into::into).map(|_| ()),
 	}
 }
 
-fn run_until_exit<T, C, E>(
-	mut runtime: Runtime,
-	service: T,
-	e: E,
-) -> error::Result<()>
-	where
-		T: Deref<Target=substrate_service::Service<C>> + Future<Item = (), Error = ()> + Send + 'static,
-		C: substrate_service::Components,
-		E: IntoExit,
+fn run_until_exit<T, C, E>(mut runtime: Runtime, service: T, e: E) -> error::Result<()>
+where
+	T: Deref<Target = substrate_service::Service<C>> + Future<Item = (), Error = ()> + Send + 'static,
+	C: substrate_service::Components,
+	E: IntoExit,
 {
 	let (exit_send, exit) = exit_future::signal();
 

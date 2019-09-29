@@ -19,14 +19,14 @@
 #![cfg(test)]
 
 use super::*;
-use sr_primitives::BuildStorage;
-use sr_primitives::{traits::{IdentityLookup}, testing::Header};
-use primitives::{H256, Blake2Hasher};
-use sr_io::with_externalities;
-use support::{ impl_outer_origin, assert_ok };
 use crate::{GenesisConfig, Module, Trait};
+use primitives::{Blake2Hasher, H256};
+use sr_io::with_externalities;
+use sr_primitives::BuildStorage;
+use sr_primitives::{testing::Header, traits::IdentityLookup};
+use support::{assert_ok, impl_outer_origin};
 
-impl_outer_origin!{
+impl_outer_origin! {
 	pub enum Origin for Test {}
 }
 
@@ -45,30 +45,22 @@ impl system::Trait for Test {
 	type Event = ();
 }
 
-
-
-
 impl Trait for Test {
 	type Event = ();
 }
-
 
 type System = system::Module<Test>;
 type Try = Module<Test>;
 
 fn new_test_ext() -> sr_io::TestExternalities<Blake2Hasher> {
 	let mut t = system::GenesisConfig::default().build_storage::<Test>().unwrap().0;
-	t.extend(GenesisConfig {
-		some_option: 42,
-	}.build_storage().unwrap().0);
+	t.extend(GenesisConfig { some_option: 42 }.build_storage().unwrap().0);
 	t.into()
-
 }
 
 #[test]
 fn it_works_for_default_value() {
 	with_externalities(&mut new_test_ext(), || {
-
 		assert_eq!(Try::something(), 0);
 		assert_eq!(Try::some_option(), Some(42));
 	});

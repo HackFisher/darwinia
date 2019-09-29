@@ -18,57 +18,50 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 // `construct_runtime!` does a lot of recursion and requires us to increase the limit to 256.
-#![recursion_limit="256"]
+#![recursion_limit = "256"]
 
-use rstd::prelude::*;
-use support::{
-	construct_runtime, parameter_types, traits::{SplitTwoWays, Currency, OnUnbalanced}
-};
-use substrate_primitives::u32_trait::{_1, _2, _3, _4};
-pub use node_primitives::{
-	AccountId, AccountIndex, AuraId, Balance, BlockNumber, Hash, Nonce,
-	Moment, Signature,
+use client::{
+	block_builder::api::{self as block_builder_api, CheckInherentsResult, InherentData},
+	impl_runtime_apis, runtime_api as client_api,
 };
 use grandpa::fg_primitives::{self, ScheduledChange};
-use client::{
-	block_builder::api::{self as block_builder_api, InherentData, CheckInherentsResult},
-	runtime_api as client_api, impl_runtime_apis
-};
-use runtime_primitives::{ApplyResult, generic, create_runtime_str};
+pub use node_primitives::{AccountId, AccountIndex, AuraId, Balance, BlockNumber, Hash, Moment, Nonce, Signature};
+use rstd::prelude::*;
+use runtime_primitives::traits::{BlakeTwo256, Block as BlockT, Convert, DigestFor, NumberFor, StaticLookup};
 use runtime_primitives::transaction_validity::TransactionValidity;
-use runtime_primitives::traits::{
-	BlakeTwo256, Block as BlockT, DigestFor, NumberFor, StaticLookup, Convert,
+use runtime_primitives::{create_runtime_str, generic, ApplyResult};
+use substrate_primitives::u32_trait::{_1, _2, _3, _4};
+use support::{
+	construct_runtime, parameter_types,
+	traits::{Currency, OnUnbalanced, SplitTwoWays},
 };
 use version::RuntimeVersion;
 
+use finality_tracker::{DEFAULT_REPORT_LATENCY, DEFAULT_WINDOW_SIZE};
+use grandpa::{AuthorityId as GrandpaId, AuthorityWeight as GrandpaWeight};
+use substrate_primitives::OpaqueMetadata;
 #[cfg(any(feature = "std", test))]
 use version::NativeVersion;
-use substrate_primitives::OpaqueMetadata;
-use grandpa::{AuthorityId as GrandpaId, AuthorityWeight as GrandpaWeight};
-use finality_tracker::{DEFAULT_REPORT_LATENCY, DEFAULT_WINDOW_SIZE};
 
-#[cfg(any(feature = "std", test))]
-pub use runtime_primitives::BuildStorage;
-pub use timestamp::Call as TimestampCall;
 pub use balances::Call as BalancesCall;
 pub use contracts::Gas;
-pub use runtime_primitives::{Permill, Perbill, impl_opaque_keys};
-pub use support::StorageValue;
-pub use staking::StakerStatus;
+#[cfg(any(feature = "std", test))]
+pub use runtime_primitives::BuildStorage;
+pub use runtime_primitives::{impl_opaque_keys, Perbill, Permill};
 pub use staking::EraIndex;
-
+pub use staking::StakerStatus;
+pub use support::StorageValue;
+pub use timestamp::Call as TimestampCall;
 
 /// Runtime version.
 pub const VERSION: RuntimeVersion = RuntimeVersion {
 	spec_name: create_runtime_str!("node"),
 	impl_name: create_runtime_str!("darwinia-node"),
 	authoring_version: 2,
-	spec_version: 78,
-	impl_version: 78,
+	spec_version: 79,
+	impl_version: 79,
 	apis: RUNTIME_API_VERSIONS,
 };
-
-
 
 /// Native version.
 #[cfg(any(feature = "std", test))]
@@ -101,12 +94,13 @@ impl OnUnbalanced<NegativeImbalance> for MockTreasury {
 	}
 }
 
-
 pub type DealWithFees = SplitTwoWays<
 	Balance,
 	NegativeImbalance,
-	_4, MockTreasury,   // 4 parts (80%) goes to the treasury.
-	_1, Author,     // 1 part (20%) goes to the block author.
+	_4,
+	MockTreasury, // 4 parts (80%) goes to the treasury.
+	_1,
+	Author, // 1 part (20%) goes to the block author.
 >;
 
 pub const SECS_PER_BLOCK: Moment = 6;
@@ -117,15 +111,21 @@ pub const DAYS: Moment = HOURS * 24;
 pub struct CurrencyToVoteHandler;
 
 impl CurrencyToVoteHandler {
-	fn factor() -> u128 { (Balances::total_issuance() / u64::max_value() as u128).max(1) }
+	fn factor() -> u128 {
+		(Balances::total_issuance() / u64::max_value() as u128).max(1)
+	}
 }
 
 impl Convert<u128, u64> for CurrencyToVoteHandler {
-	fn convert(x: u128) -> u64 { (x / Self::factor()) as u64 }
+	fn convert(x: u128) -> u64 {
+		(x / Self::factor()) as u64
+	}
 }
 
 impl Convert<u128, u128> for CurrencyToVoteHandler {
-	fn convert(x: u128) -> u128 { x * Self::factor() }
+	fn convert(x: u128) -> u128 {
+		x * Self::factor()
+	}
 }
 
 impl system::Trait for Runtime {
@@ -167,14 +167,12 @@ impl balances::Trait for Runtime {
 	type TransactionByteFee = TransactionByteFee;
 }
 
-
 impl kton::Trait for Runtime {
 	type Balance = Balance;
 	type Event = Event;
 	type OnMinted = ();
 	type OnRemoval = ();
 }
-
 
 impl timestamp::Trait for Runtime {
 	type Moment = u64;
@@ -194,7 +192,6 @@ parameter_types! {
 	pub const UncleGenerations: u64 = 0;
 }
 
-
 impl_opaque_keys! {
 	pub struct SessionKeys(grandpa::AuthorityId, AuraId);
 }
@@ -211,7 +208,6 @@ impl authorship::Trait for Runtime {
 // `SessionKeys`.
 // TODO: Introduce some structure to tie these together to make it a bit less of a footgun. This
 // should be easy, since OneSessionHandler trait provides the `Key` as an associated type. #2858
-
 
 parameter_types! {
 	pub const Period: BlockNumber = 1 * MINUTES;
@@ -240,8 +236,6 @@ parameter_types! {
 	pub const CAP: Balance = 10_000_000_000 * COIN;
 }
 
-
-
 impl staking::Trait for Runtime {
 	type Ring = Balances;
 	type Kton = Kton;
@@ -256,8 +250,8 @@ impl staking::Trait for Runtime {
 	// customed
 	type Cap = CAP;
 	type ErasPerEpoch = ErasPerEpoch;
+	type SessionLength = Period;
 }
-
 
 parameter_types! {
 	pub const SignedClaimHandicap: BlockNumber = 2;

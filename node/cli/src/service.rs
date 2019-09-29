@@ -23,23 +23,22 @@ use std::time::Duration;
 
 use client::{self, LongestChain};
 use consensus::{import_queue, start_aura, AuraImportQueue, SlotDuration};
-use grandpa::{self, FinalityProofProvider as GrandpaFinalityProofProvider};
-use node_executor;
-use primitives::{Pair as PairT, ed25519};
 use futures::prelude::*;
+use grandpa::{self, FinalityProofProvider as GrandpaFinalityProofProvider};
+use inherents::InherentDataProviders;
+use log::info;
+use network::construct_simple_protocol;
+use node_executor;
 use node_primitives::Block;
 use node_runtime::{GenesisConfig, RuntimeApi};
-use substrate_service::{
-	FactoryFullConfiguration, LightComponents, FullComponents, FullBackend,
-	FullClient, LightClient, LightBackend, FullExecutor, LightExecutor,
-	error::{Error as ServiceError},
-};
-use transaction_pool::{self, txpool::{Pool as TransactionPool}};
-use inherents::InherentDataProviders;
-use network::construct_simple_protocol;
+use primitives::{ed25519, Pair as PairT};
 use substrate_service::construct_service_factory;
-use log::info;
 use substrate_service::TelemetryOnConnect;
+use substrate_service::{
+	error::Error as ServiceError, FactoryFullConfiguration, FullBackend, FullClient, FullComponents, FullExecutor,
+	LightBackend, LightClient, LightComponents, LightExecutor,
+};
+use transaction_pool::{self, txpool::Pool as TransactionPool};
 
 construct_simple_protocol! {
 	/// Demo protocol attachment for substrate.
@@ -54,7 +53,10 @@ pub struct NodeConfig<F: substrate_service::ServiceFactory> {
 	inherent_data_providers: InherentDataProviders,
 }
 
-impl<F> Default for NodeConfig<F> where F: substrate_service::ServiceFactory {
+impl<F> Default for NodeConfig<F>
+where
+	F: substrate_service::ServiceFactory,
+{
 	fn default() -> NodeConfig<F> {
 		NodeConfig {
 			grandpa_import_setup: None,
@@ -211,31 +213,31 @@ construct_service_factory! {
 	}
 }
 
-
 #[cfg(test)]
 mod tests {
-	use std::sync::Arc;
+	use crate::service::Factory;
 	use consensus::CompatibleDigestItem;
-	use consensus_common::{Environment, Proposer, ImportBlock, BlockOrigin, ForkChoiceStrategy};
-	use node_primitives::DigestItem;
-	use node_runtime::{BalancesCall, Call, COIN, UncheckedExtrinsic};
-	use parity_codec::{Compact, Encode, Decode};
-	use primitives::{
-		crypto::Pair as CryptoPair, ed25519::Pair, blake2_256,
-		sr25519::Public as AddressPublic, H256,
-	};
-	use sr_primitives::{generic::{BlockId, Era, Digest}, traits::Block, OpaqueExtrinsic};
-	use timestamp;
+	use consensus_common::{BlockOrigin, Environment, ForkChoiceStrategy, ImportBlock, Proposer};
 	use finality_tracker;
 	use keyring::{ed25519::Keyring as AuthorityKeyring, sr25519::Keyring as AccountKeyring};
-	use substrate_service::ServiceFactory;
+	use node_primitives::DigestItem;
+	use node_runtime::{BalancesCall, Call, UncheckedExtrinsic, COIN};
+	use parity_codec::{Compact, Decode, Encode};
+	use primitives::{blake2_256, crypto::Pair as CryptoPair, ed25519::Pair, sr25519::Public as AddressPublic, H256};
 	use service_test::SyncService;
-	use crate::service::Factory;
+	use sr_primitives::{
+		generic::{BlockId, Digest, Era},
+		traits::Block,
+		OpaqueExtrinsic,
+	};
+	use std::sync::Arc;
+	use substrate_service::ServiceFactory;
+	use timestamp;
 
 	#[cfg(feature = "rhd")]
 	fn test_sync() {
+		use client::{BlockOrigin, ImportBlock};
 		use {service_test, Factory};
-		use client::{ImportBlock, BlockOrigin};
 
 		let alice: Arc<ed25519::Pair> = Arc::new(Keyring::Alice.into());
 		let bob: Arc<ed25519::Pair> = Arc::new(Keyring::Bob.into());
@@ -253,7 +255,9 @@ mod tests {
 				force_delay: 0,
 				handle: dummy_runtime.executor(),
 			};
-			let (proposer, _, _) = proposer_factory.init(&parent_header, &validators, alice.clone()).unwrap();
+			let (proposer, _, _) = proposer_factory
+				.init(&parent_header, &validators, alice.clone())
+				.unwrap();
 			let block = proposer.propose().expect("Error making test block");
 			ImportBlock {
 				origin: BlockOrigin::File,
@@ -270,22 +274,19 @@ mod tests {
 				0,
 				Call::Balances(BalancesCall::transfer(RawAddress::Id(bob.public().0.into()), 69.into())),
 				Era::immortal(),
-				service.client().genesis_hash()
+				service.client().genesis_hash(),
 			);
 			let signature = alice.sign(&payload.encode()).into();
 			let id = alice.public().0.into();
 			let xt = UncheckedExtrinsic {
 				signature: Some((RawAddress::Id(id), signature, payload.0, Era::immortal())),
 				function: payload.1,
-			}.encode();
+			}
+			.encode();
 			let v: Vec<u8> = Decode::decode(&mut xt.as_slice()).unwrap();
 			OpaqueExtrinsic(v)
 		};
-		service_test::sync::<Factory, _, _>(
-			chain_spec::integration_test_config(),
-			block_factory,
-			extrinsic_factory,
-		);
+		service_test::sync::<Factory, _, _>(chain_spec::integration_test_config(), block_factory, extrinsic_factory);
 	}
 
 	#[test]
@@ -314,13 +315,13 @@ mod tests {
 			});
 
 			let mut digest = Digest::<H256>::default();
-			digest.push(<DigestItem as CompatibleDigestItem<Pair>>::aura_pre_digest(slot_num * 10 / 2));
+			digest.push(<DigestItem as CompatibleDigestItem<Pair>>::aura_pre_digest(
+				slot_num * 10 / 2,
+			));
 			let proposer = proposer_factory.init(&parent_header).unwrap();
-			let new_block = proposer.propose(
-				inherent_data,
-				digest,
-				std::time::Duration::from_secs(1),
-			).expect("Error making test block");
+			let new_block = proposer
+				.propose(inherent_data, digest, std::time::Duration::from_secs(1))
+				.expect("Error making test block");
 
 			let (new_header, new_body) = new_block.deconstruct();
 			let pre_hash = new_header.hash();
@@ -328,9 +329,7 @@ mod tests {
 			// add it to a digest item.
 			let to_sign = pre_hash.encode();
 			let signature = alice.sign(&to_sign[..]);
-			let item = <DigestItem as CompatibleDigestItem<Pair>>::aura_seal(
-				signature,
-			);
+			let item = <DigestItem as CompatibleDigestItem<Pair>>::aura_seal(signature);
 			slot_num += 1;
 
 			ImportBlock {
@@ -359,29 +358,21 @@ mod tests {
 			let function = Call::Balances(BalancesCall::transfer(to.into(), amount));
 			let era = Era::immortal();
 			let raw_payload = (Compact(index), function, era, genesis_hash);
-			let signature = raw_payload.using_encoded(|payload| if payload.len() > 256 {
-				signer.sign(&blake2_256(payload)[..])
-			} else {
-				signer.sign(payload)
+			let signature = raw_payload.using_encoded(|payload| {
+				if payload.len() > 256 {
+					signer.sign(&blake2_256(payload)[..])
+				} else {
+					signer.sign(payload)
+				}
 			});
-			let xt = UncheckedExtrinsic::new_signed(
-				index,
-				raw_payload.1,
-				from.into(),
-				signature.into(),
-				era,
-			).encode();
+			let xt = UncheckedExtrinsic::new_signed(index, raw_payload.1, from.into(), signature.into(), era).encode();
 			let v: Vec<u8> = Decode::decode(&mut xt.as_slice()).unwrap();
 
 			index += 1;
 			OpaqueExtrinsic(v)
 		};
 
-		service_test::sync::<Factory, _, _>(
-			chain_spec,
-			block_factory,
-			extrinsic_factory,
-		);
+		service_test::sync::<Factory, _, _>(chain_spec, block_factory, extrinsic_factory);
 	}
 
 	#[test]
@@ -391,10 +382,7 @@ mod tests {
 
 		service_test::consensus::<Factory>(
 			crate::chain_spec::tests::integration_test_config_with_two_authorities(),
-			vec![
-				"//Alice".into(),
-				"//Bob".into(),
-			],
+			vec!["//Alice".into(), "//Bob".into()],
 		)
 	}
 }

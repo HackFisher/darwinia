@@ -5,33 +5,33 @@
 // DONE: test visibility of functions in `decl_module!` and `impl Module` block
 // DONE: check the priority between configs set in chain_spec or in module
 
-
 // TODO: test difference between dispatch::Result & rstd::result::Result
 // TODO: try out add_extra_genesis
 // TODO: check tests in executor
-
 
 //! Tests in `try` mod is to test origin-module in SRML
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use rstd::{cmp, result};
 use rstd::prelude::*;
-use support::{decl_event, decl_module, decl_storage, StorageMap, StorageValue};
+use rstd::{cmp, result};
 use support::dispatch::Result;
+use support::{decl_event, decl_module, decl_storage, StorageMap, StorageValue};
 use system::ensure_signed;
 
 mod tests;
 
-
 pub trait Trait: system::Trait {
-    /// The overarching event type.
-    type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
+	/// The overarching event type.
+	type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }
 
 decl_event!(
-	pub enum Event<T> where AccountId = <T as system::Trait>::AccountId {
-	    SomethingStored(u32, AccountId),
+	pub enum Event<T>
+	where
+		AccountId = <T as system::Trait>::AccountId,
+	{
+		SomethingStored(u32, AccountId),
 	}
 );
 
@@ -49,7 +49,7 @@ decl_module! {
 	/// The module declaration.
 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
 
-		fn deposit_event<T>() = default;
+		fn deposit_event() = default;
 
 		pub fn do_something(origin, something: u32) -> Result {
 			let who = ensure_signed(origin)?;
@@ -63,25 +63,23 @@ decl_module! {
 		}
 
 		pub fn do_map(origin, uint: u32) -> Result {
-		    let who = ensure_signed(origin)?;
+			let who = ensure_signed(origin)?;
 
-		    <MapOption<T>>::insert(uint, who.clone());
-		    <Map<T>>::insert(uint, who.clone());
+			<MapOption<T>>::insert(uint, who.clone());
+			<Map<T>>::insert(uint, who.clone());
 
-            Ok(())
+			Ok(())
 		}
 
 		fn update_list(value: u32, is_add: bool) {
-		    let mut list = Self::list(1);
-		    if is_add {
-		        list.push(value);
-		        List::insert(1, list);
-		    } else {
-		        list.remove(value as usize);
-		    }
+			let mut list = Self::list(1);
+			if is_add {
+				list.push(value);
+				List::insert(1, list);
+			} else {
+				list.remove(value as usize);
+			}
 
 		}
 	}
 }
-
-
