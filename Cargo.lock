@@ -3186,7 +3186,7 @@ dependencies = [
 
 [[package]]
 name = "parity-wasm"
-version = "0.40.2"
+version = "0.40.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -3497,7 +3497,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "byteorder 1.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "parity-wasm 0.40.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "parity-wasm 0.40.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -4429,7 +4429,7 @@ version = "2.0.0"
 source = "git+https://github.com/paritytech/substrate.git#e84f6158b383880ba5fc86cb62c9fea10f5f3071"
 dependencies = [
  "parity-scale-codec 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "parity-wasm 0.40.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "parity-wasm 0.40.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "pwasm-utils 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.101 (registry+https://github.com/rust-lang/crates.io-index)",
  "sr-io 2.0.0 (git+https://github.com/paritytech/substrate.git)",
@@ -5134,7 +5134,7 @@ dependencies = [
  "libsecp256k1 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "parity-scale-codec 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "parity-wasm 0.40.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "parity-wasm 0.40.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "parking_lot 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "sr-io 2.0.0 (git+https://github.com/paritytech/substrate.git)",
  "sr-version 2.0.0 (git+https://github.com/paritytech/substrate.git)",
@@ -6576,7 +6576,7 @@ dependencies = [
  "memory_units 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-rational 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-traits 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "parity-wasm 0.40.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "parity-wasm 0.40.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "wasmi-validation 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -6593,7 +6593,7 @@ name = "wasmi-validation"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "parity-wasm 0.40.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "parity-wasm 0.40.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -7090,7 +7090,7 @@ dependencies = [
 "checksum parity-util-mem 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "89e80f22052161e0cb55cb5a8a75890420c525031f95c9d262dbb0434aa85dc1"
 "checksum parity-util-mem 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "e2005637ccf93dbb60c85081ccaaf3f945f573da48dcc79f27f9646caa3ec1dc"
 "checksum parity-wasm 0.31.3 (registry+https://github.com/rust-lang/crates.io-index)" = "511379a8194230c2395d2f5fa627a5a7e108a9f976656ce723ae68fca4097bfc"
-"checksum parity-wasm 0.40.2 (registry+https://github.com/rust-lang/crates.io-index)" = "49d1e33551976be5345d2ecbfe995830719746c7f0902f0880a13d40e215f851"
+"checksum parity-wasm 0.40.3 (registry+https://github.com/rust-lang/crates.io-index)" = "1e39faaa292a687ea15120b1ac31899b13586446521df6c149e46f1584671e0f"
 "checksum parking_lot 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)" = "f0802bff09003b291ba756dc7e79313e51cc31667e94afbe847def490424cde5"
 "checksum parking_lot 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)" = "ab41b4aed082705d1056416ae4468b6ea99d52599ecf3169b00088d43113e337"
 "checksum parking_lot 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fa7767817701cce701d5585b9c4db3cdd02086398322c1d7e8bf5094a96a2ce7"

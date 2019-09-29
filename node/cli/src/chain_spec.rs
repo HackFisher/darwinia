@@ -21,7 +21,7 @@ use hex_literal::hex;
 use node_primitives::{AccountId, AuraId, Balance};
 pub use node_runtime::GenesisConfig;
 use node_runtime::{
-	AuraConfig, BalancesConfig, ContractsConfig, GrandpaConfig, IndicesConfig, KtonConfig, Perbill, SessionConfig,
+	BabeConfig, BalancesConfig, GrandpaConfig, IndicesConfig, KtonConfig, Perbill, SessionConfig,
 	SessionKeys, StakerStatus, StakingConfig, SudoConfig, SystemConfig, TimestampConfig, COIN, DAYS, MILLI,
 	SECS_PER_BLOCK,
 };
@@ -107,8 +107,7 @@ fn staging_testnet_config_genesis() -> GenesisConfig {
 
 	GenesisConfig {
 		system: Some(SystemConfig {
-			code: include_bytes!("../../runtime/wasm/target/wasm32-unknown-unknown/release/node_runtime.compact.wasm")
-				.to_vec(), // FIXME change once we have #1252
+			code: WASM_BINARY.to_vec(),
 			changes_trie_config: Default::default(),
 		}),
 		balances: Some(BalancesConfig {
@@ -160,14 +159,10 @@ fn staging_testnet_config_genesis() -> GenesisConfig {
 		timestamp: Some(TimestampConfig {
 			minimum_period: SECS_PER_BLOCK / 2, // due to the nature of aura the slots are 2*period
 		}),
-		contracts: Some(ContractsConfig {
-			current_schedule: Default::default(),
-			gas_price: 1 * MILLI,
-		}),
 		sudo: Some(SudoConfig {
 			key: endowed_accounts[0].clone(),
 		}),
-		aura: Some(AuraConfig {
+		babe: Some(BabeConfig {
 			authorities: initial_authorities.iter().map(|x| x.2.clone()).collect(),
 		}),
 		grandpa: Some(GrandpaConfig {
@@ -251,8 +246,7 @@ pub fn testnet_genesis(
 
 	GenesisConfig {
 		system: Some(SystemConfig {
-			code: include_bytes!("../../runtime/wasm/target/wasm32-unknown-unknown/release/node_runtime.compact.wasm")
-				.to_vec(),
+			code: WASM_BINARY.to_vec(),
 			changes_trie_config: Default::default(),
 		}),
 		indices: Some(IndicesConfig {
@@ -296,15 +290,8 @@ pub fn testnet_genesis(
 		timestamp: Some(TimestampConfig {
 			minimum_period: 3, // 3*2=6 second block time.
 		}),
-		contracts: Some(ContractsConfig {
-			current_schedule: contracts::Schedule {
-				enable_println, // this should only be enabled on development chains
-				..Default::default()
-			},
-			gas_price: 1 * MILLI,
-		}),
 		sudo: Some(SudoConfig { key: root_key }),
-		aura: Some(AuraConfig {
+		babe: Some(BabeConfig {
 			authorities: initial_authorities.iter().map(|x| x.2.clone()).collect(),
 		}),
 		grandpa: Some(GrandpaConfig {
@@ -363,8 +350,7 @@ pub fn crayfish_testnet_genesis(
 
 	GenesisConfig {
 		system: Some(SystemConfig {
-			code: include_bytes!("../../runtime/wasm/target/wasm32-unknown-unknown/release/node_runtime.compact.wasm")
-				.to_vec(),
+			code: WASM_BINARY.to_vec(),
 			changes_trie_config: Default::default(),
 		}),
 		indices: Some(IndicesConfig {
@@ -407,15 +393,8 @@ pub fn crayfish_testnet_genesis(
 		timestamp: Some(TimestampConfig {
 			minimum_period: 3, // 3*2=6 second block time.
 		}),
-		contracts: Some(ContractsConfig {
-			current_schedule: contracts::Schedule {
-				enable_println, // this should only be enabled on development chains
-				..Default::default()
-			},
-			gas_price: 1 * MILLI,
-		}),
 		sudo: Some(SudoConfig { key: root_key }),
-		aura: Some(AuraConfig {
+		babe: Some(BabeConfig {
 			authorities: initial_authorities.iter().map(|x| x.2.clone()).collect(),
 		}),
 		grandpa: Some(GrandpaConfig {

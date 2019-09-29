@@ -31,10 +31,7 @@ pub use substrate_executor::NativeExecutor;
 native_executor_instance!(
 	pub Executor,
 	node_runtime::api::dispatch,
-	node_runtime::native_version,
-	include_bytes!(
-		"../../runtime/wasm/target/wasm32-unknown-unknown/release/node_runtime.compact.wasm"
-	)
+	node_runtime::native_version
 );
 
 #[cfg(test)]
@@ -67,16 +64,14 @@ mod tests {
 	/// making the binary slimmer. There is a convention to use compact version of the runtime
 	/// as canonical. This is why `native_executor_instance` also uses the compact version of the
 	/// runtime.
-	const COMPACT_CODE: &[u8] =
-		include_bytes!("../../runtime/wasm/target/wasm32-unknown-unknown/release/node_runtime.compact.wasm");
+	const COMPACT_CODE: &[u8] = node_runtime::WASM_BINARY;
 
 	/// The wasm runtime binary which hasn't undergone the compacting process.
 	///
 	/// The idea here is to pass it as the current runtime code to the executor so the executor will
 	/// have to execute provided wasm code instead of the native equivalent. This trick is used to
 	/// test code paths that differ between native and wasm versions.
-	const BLOATY_CODE: &[u8] =
-		include_bytes!("../../runtime/wasm/target/wasm32-unknown-unknown/release/node_runtime.wasm");
+	const BLOATY_CODE: &[u8] = node_runtime::WASM_BINARY_BLOATY;
 
 	const GENESIS_HASH: [u8; 32] = [69u8; 32];
 
