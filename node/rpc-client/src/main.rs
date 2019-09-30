@@ -24,7 +24,7 @@
 use futures::Future;
 use hyper::rt;
 use jsonrpc_core_client::{transports::http, RpcError};
-use node_primitives::Hash;
+use node_runtime::Hash;
 use substrate_rpc::author::{hash::ExtrinsicOrHash, AuthorClient};
 
 fn main() {

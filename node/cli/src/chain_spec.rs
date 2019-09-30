@@ -16,34 +16,48 @@
 
 //! Substrate chain configurations.
 
-use grandpa::AuthorityId as GrandpaId;
-use hex_literal::hex;
-use node_primitives::{AccountId, AuraId, Balance};
-pub use node_runtime::GenesisConfig;
+use chain_spec::ChainSpecExtension;
+use primitives::{Pair, Public, crypto::UncheckedInto};
+
 use node_runtime::{
-	BabeConfig, BalancesConfig, GrandpaConfig, IndicesConfig, KtonConfig, Perbill, SessionConfig,
-	SessionKeys, StakerStatus, StakingConfig, SudoConfig, SystemConfig, TimestampConfig, COIN, DAYS, MILLI,
-	SECS_PER_BLOCK,
+	AuthorityDiscoveryConfig, BabeConfig, BalancesConfig, KtonConfig,
+	GrandpaConfig, ImOnlineConfig, IndicesConfig, SessionConfig, SessionKeys, StakerStatus,
+	StakingConfig, SudoConfig, SystemConfig, WASM_BINARY,
 };
-use primitives::{crypto::UncheckedInto, ed25519, sr25519, Pair};
-use serde_json::de::ParserNumber;
-use serde_json::Number;
+
+use babe_primitives::{AuthorityId as BabeId};
+use grandpa_primitives::{AuthorityId as GrandpaId};
+
 use substrate_service;
 use substrate_service::Properties;
 use substrate_telemetry::TelemetryEndpoints;
+
+use hex_literal::hex;
+
+use sr_primitives::Perbill;
+
+use serde_json::Number;
+use serde_json::de::ParserNumber;
 
 const STAGING_TELEMETRY_URL: &str = "wss://telemetry.polkadot.io/submit/";
 
 /// Specialized `ChainSpec`.
 pub type ChainSpec = substrate_service::ChainSpec<GenesisConfig>;
 
+/// Helper function to generate a crypto pair from seed
+pub fn get_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pair>::Public {
+	TPublic::Pair::from_string(&format!("//{}", seed), None)
+		.expect("static values are valid; qed")
+		.public()
+}
+
 /// Flaming Fir testnet generator
 pub fn flaming_fir_config() -> Result<ChainSpec, String> {
-	ChainSpec::from_embedded(include_bytes!("../res/flaming-fir.json"))
+	ChainSpec::from_json_bytes(include_bytes!("../res/flaming-fir.json"))
 }
 
 pub fn crayfish_fir_config() -> Result<ChainSpec, String> {
-	ChainSpec::from_embedded(include_bytes!("../res/crayfish-fir.json"))
+	ChainSpec::from_json_bytes(include_bytes!("../res/crayfish-fir.json"))
 }
 
 fn staging_testnet_config_genesis() -> GenesisConfig {
@@ -136,29 +150,31 @@ fn staging_testnet_config_genesis() -> GenesisConfig {
 				.collect::<Vec<_>>(),
 		}),
 		session: Some(SessionConfig {
-			validators: initial_authorities.iter().map(|x| x.1.clone()).collect(),
+//			validators: initial_authorities.iter().map(|x| x.1.clone()).collect(),
 			keys: initial_authorities
 				.iter()
 				.map(|x| (x.1.clone(), SessionKeys(x.2.clone(), x.2.clone())))
 				.collect::<Vec<_>>(),
 		}),
-		staking: Some(StakingConfig {
+		ostaking: Some(StakingConfig {
 			current_era: 0,
-			current_era_total_reward: 80_000_000 * COIN / 63720,
-			offline_slash: Perbill::from_parts(1_000_000),
-			session_reward: Perbill::from_percent(90),
+//			current_era_total_reward: 80_000_000 * COIN / 63720,
+//			offline_slash: Perbill::from_parts(1_000_000),
+//			session_reward: Perbill::from_percent(90),
 			validator_count: 7,
-			offline_slash_grace: 4,
+//			offline_slash_grace: 4,
 			minimum_validator_count: 4,
 			stakers: initial_authorities
 				.iter()
 				.map(|x| (x.0.clone(), x.1.clone(), STASH, StakerStatus::Validator))
 				.collect(),
 			invulnerables: initial_authorities.iter().map(|x| x.1.clone()).collect(),
+			slash_reward_fraction: Perbill::from_percent(10),
+			.. Default::default()
 		}),
-		timestamp: Some(TimestampConfig {
-			minimum_period: SECS_PER_BLOCK / 2, // due to the nature of aura the slots are 2*period
-		}),
+//		timestamp: Some(TimestampConfig {
+//			minimum_period: SECS_PER_BLOCK / 2, // due to the nature of aura the slots are 2*period
+//		}),
 		sudo: Some(SudoConfig {
 			key: endowed_accounts[0].clone(),
 		}),
@@ -182,38 +198,18 @@ pub fn staging_testnet_config() -> ChainSpec {
 		Some(TelemetryEndpoints::new(vec![(STAGING_TELEMETRY_URL.to_string(), 0)])),
 		None,
 		None,
-		None,
+		Default::default(),
 	)
 }
 
-/// Helper function to generate AccountId from seed
-pub fn get_account_id_from_seed(seed: &str) -> AccountId {
-	sr25519::Pair::from_string(&format!("//{}", seed), None)
-		.expect("static values are valid; qed")
-		.public()
-}
-
-/// Helper function to generate AuraId from seed
-pub fn get_aura_id_from_seed(seed: &str) -> AuraId {
-	ed25519::Pair::from_string(&format!("//{}", seed), None)
-		.expect("static values are valid; qed")
-		.public()
-}
-
-/// Helper function to generate GrandpaId from seed
-pub fn get_grandpa_id_from_seed(seed: &str) -> GrandpaId {
-	ed25519::Pair::from_string(&format!("//{}", seed), None)
-		.expect("static values are valid; qed")
-		.public()
-}
-
 /// Helper function to generate stash, controller and session key from seed
-pub fn get_authority_keys_from_seed(seed: &str) -> (AccountId, AccountId, AuraId, GrandpaId) {
+pub fn get_authority_keys_from_seed(seed: &str) -> (AccountId, AccountId, GrandpaId, BabeId, ImOnlineId) {
 	(
-		get_account_id_from_seed(&format!("{}//stash", seed)),
-		get_account_id_from_seed(seed),
-		get_aura_id_from_seed(seed),
-		get_grandpa_id_from_seed(seed),
+		get_from_seed::<AccountId>(&format!("{}//stash", seed)),
+		get_from_seed::<AccountId>(seed),
+		get_from_seed::<GrandpaId>(seed),
+		get_from_seed::<BabeId>(seed),
+		get_from_seed::<ImOnlineId>(seed),
 	)
 }
 
@@ -266,30 +262,32 @@ pub fn testnet_genesis(
 			vesting: vec![],
 		}),
 		session: Some(SessionConfig {
-			validators: initial_authorities.iter().map(|x| x.1.clone()).collect(),
+//			validators: initial_authorities.iter().map(|x| x.1.clone()).collect(),
 			keys: initial_authorities
 				.iter()
 				.map(|x| (x.1.clone(), SessionKeys(x.2.clone(), x.2.clone())))
 				.collect::<Vec<_>>(),
 		}),
-		staking: Some(StakingConfig {
+		ostaking: Some(StakingConfig {
 			current_era: 0,
 			// TODO: ready for hacking
-			current_era_total_reward: 80_000_000 * COIN / 63720,
+//			current_era_total_reward: 80_000_000 * COIN / 63720,
 			minimum_validator_count: 1,
 			validator_count: 3,
-			offline_slash: Perbill::from_parts(1_000_000),
-			session_reward: Perbill::from_percent(90),
-			offline_slash_grace: 4,
+//			offline_slash: Perbill::from_parts(1_000_000),
+//			session_reward: Perbill::from_percent(90),
+//			offline_slash_grace: 4,
 			stakers: initial_authorities
 				.iter()
 				.map(|x| (x.0.clone(), x.1.clone(), STASH, StakerStatus::Validator))
 				.collect(),
 			invulnerables: initial_authorities.iter().map(|x| x.1.clone()).collect(),
+			slash_reward_fraction: Perbill::from_percent(10),
+			.. Default::default()
 		}),
-		timestamp: Some(TimestampConfig {
-			minimum_period: 3, // 3*2=6 second block time.
-		}),
+//		timestamp: Some(TimestampConfig {
+//			minimum_period: 3, // 3*2=6 second block time.
+//		}),
 		sudo: Some(SudoConfig { key: root_key }),
 		babe: Some(BabeConfig {
 			authorities: initial_authorities.iter().map(|x| x.2.clone()).collect(),
@@ -330,18 +328,18 @@ pub fn crayfish_testnet_genesis(
 ) -> GenesisConfig {
 	let endowed_accounts: Vec<AccountId> = endowed_accounts.unwrap_or_else(|| {
 		vec![
-			get_account_id_from_seed("Alice"),
-			get_account_id_from_seed("Bob"),
-			get_account_id_from_seed("Charlie"),
-			get_account_id_from_seed("Dave"),
-			get_account_id_from_seed("Eve"),
-			get_account_id_from_seed("Ferdie"),
-			get_account_id_from_seed("Alice//stash"),
-			get_account_id_from_seed("Bob//stash"),
-			get_account_id_from_seed("Charlie//stash"),
-			get_account_id_from_seed("Dave//stash"),
-			get_account_id_from_seed("Eve//stash"),
-			get_account_id_from_seed("Ferdie//stash"),
+			get_from_seed::<AccountId>("Alice"),
+			get_from_seed::<AccountId>("Bob"),
+			get_from_seed::<AccountId>("Charlie"),
+			get_from_seed::<AccountId>("Dave"),
+			get_from_seed::<AccountId>("Eve"),
+			get_from_seed::<AccountId>("Ferdie"),
+			get_from_seed::<AccountId>("Alice//stash"),
+			get_from_seed::<AccountId>("Bob//stash"),
+			get_from_seed::<AccountId>("Charlie//stash"),
+			get_from_seed::<AccountId>("Dave//stash"),
+			get_from_seed::<AccountId>("Eve//stash"),
+			get_from_seed::<AccountId>("Ferdie//stash"),
 		]
 	});
 
@@ -370,29 +368,31 @@ pub fn crayfish_testnet_genesis(
 			vesting: vec![],
 		}),
 		session: Some(SessionConfig {
-			validators: initial_authorities.iter().map(|x| x.1.clone()).collect(),
+//			validators: initial_authorities.iter().map(|x| x.1.clone()).collect(),
 			keys: initial_authorities
 				.iter()
 				.map(|x| (x.1.clone(), SessionKeys(x.2.clone(), x.2.clone())))
 				.collect::<Vec<_>>(),
 		}),
-		staking: Some(StakingConfig {
+		ostaking: Some(StakingConfig {
 			current_era: 0,
-			current_era_total_reward: 80_000_000 * COIN / 105120,
+//			current_era_total_reward: 80_000_000 * COIN / 105120,
 			minimum_validator_count: 1,
 			validator_count: 30,
-			offline_slash: Perbill::from_parts(1_000_000),
-			session_reward: Perbill::from_percent(90),
-			offline_slash_grace: 4,
+//			offline_slash: Perbill::from_parts(1_000_000),
+//			session_reward: Perbill::from_percent(90),
+//			offline_slash_grace: 4,
 			stakers: initial_authorities
 				.iter()
 				.map(|x| (x.0.clone(), x.1.clone(), STASH, StakerStatus::Validator))
 				.collect(),
 			invulnerables: initial_authorities.iter().map(|x| x.1.clone()).collect(),
+			slash_reward_fraction: Perbill::from_percent(10),
+			.. Default::default()
 		}),
-		timestamp: Some(TimestampConfig {
-			minimum_period: 3, // 3*2=6 second block time.
-		}),
+//		timestamp: Some(TimestampConfig {
+//			minimum_period: 3, // 3*2=6 second block time.
+//		}),
 		sudo: Some(SudoConfig { key: root_key }),
 		babe: Some(BabeConfig {
 			authorities: initial_authorities.iter().map(|x| x.2.clone()).collect(),
@@ -413,7 +413,7 @@ pub fn development_config() -> ChainSpec {
 		None,
 		None,
 		None,
-		None,
+		Default::default(),
 	)
 }
 
@@ -448,8 +448,9 @@ pub fn local_testnet_config() -> ChainSpec {
 		vec![],
 		None,
 		None,
-		None,
 		token_properties(),
+		Default::default(),
+
 	)
 }
 
@@ -462,8 +463,9 @@ pub fn crayfish_testnet_config() -> ChainSpec {
 		vec![],
 		Some(TelemetryEndpoints::new(vec![(STAGING_TELEMETRY_URL.to_string(), 0)])),
 		Some("DAR"),
-		None,
 		token_properties(),
+		Default::default(),
+
 	)
 }
 
@@ -502,7 +504,7 @@ pub(crate) mod tests {
 			None,
 			None,
 			None,
-			None,
+			Default::default(),
 		)
 	}
 
@@ -516,7 +518,7 @@ pub(crate) mod tests {
 			None,
 			None,
 			None,
-			None,
+			Default::default(),
 		)
 	}
 

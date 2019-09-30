@@ -15,8 +15,7 @@
 // along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Some configurable implementations as associated type for the substrate runtime.
-
-use node_primitives::Balance;
+use crate::Balance;
 use sr_primitives::weights::{Weight, WeightMultiplier};
 use sr_primitives::traits::{Convert, Saturating};
 use sr_primitives::Fixed64;

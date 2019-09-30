@@ -20,9 +20,11 @@ use sr_primitives::{
 
 use im_online::sr25519::{AuthorityId as ImOnlineId, AuthoritySignature as ImOnlineSignature};
 use authority_discovery_primitives::{AuthorityId as EncodedAuthorityId, Signature as EncodedSignature};
+
 use sr_primitives::curve::PiecewiseLinear;
 use sr_primitives::traits::{NumberFor, BlakeTwo256, Block as BlockT, StaticLookup, Verify, ConvertInto};
 use sr_primitives::weights::Weight;
+
 use babe::{AuthorityId as BabeId};
 use grandpa::{AuthorityId as GrandpaId, AuthorityWeight as GrandpaWeight};
 use grandpa::fg_primitives;
@@ -40,6 +42,9 @@ pub use sr_primitives::BuildStorage;
 pub use timestamp::Call as TimestampCall;
 pub use balances::Call as BalancesCall;
 pub use sr_primitives::{Permill, Perbill};
+
+pub use support::StorageValue;
+pub use ostaking::StakerStatus;
 
 use system::offchain::TransactionSubmitter;
 
@@ -59,6 +64,9 @@ pub type AccountIndex = u32;
 
 /// Balance of an account.
 pub type Balance = u128;
+
+/// Type used for expressing timestamp.
+pub type Moment = u64;
 
 /// Index of a transaction in the chain.
 pub type Index = u32;
@@ -107,8 +115,8 @@ pub mod opaque {
 
 /// This runtime version.
 pub const VERSION: RuntimeVersion = RuntimeVersion {
-	spec_name: create_runtime_str!("node-template"),
-	impl_name: create_runtime_str!("node-template"),
+	spec_name: create_runtime_str!("node"),
+	impl_name: create_runtime_str!("darwinia-node"),
 	authoring_version: 3,
 	spec_version: 4,
 	impl_version: 4,
@@ -235,7 +243,7 @@ impl kton::Trait for Runtime {
 
 impl timestamp::Trait for Runtime {
 	/// A timestamp: milliseconds since the unix epoch.
-	type Moment = u64;
+	type Moment = Moment;
 	type OnTimestampSet = Babe;
 	type MinimumPeriod = MinimumPeriod;
 }

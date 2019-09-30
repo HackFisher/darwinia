@@ -36,14 +36,6 @@ authorship = { package = "srml-authorship", git = 'https://github.com/paritytech
 session = { package = "srml-session", git = 'https://github.com/paritytech/substrate.git', default-features = false }
 im-online = { package = "srml-im-online", git = 'https://github.com/paritytech/substrate.git', default-features = false }
 
-
-#contracts = { package = "srml-contracts", git = 'https://github.com/paritytech/substrate.git', default-features = false }
-#democracy = { package = "srml-democracy", git = 'https://github.com/paritytech/substrate.git', default-features = false }
-#finality-tracker = { package = "srml-finality-tracker", git = 'https://github.com/paritytech/substrate.git', default-features = false }
-#treasury = { package = "srml-treasury", git = 'https://github.com/paritytech/substrate.git', default-features = false }
-node-primitives = {path = "../primitives", default-features = false }
-#substrate-keyring = { git = 'https://github.com/paritytech/substrate.git', optional = true }
-
 # customed
 kton = { package = "evo-kton", path = '../../srml/kton', default-features = false}
 ostaking = { package = "ostaking", path = "../../srml/ostaking", default-features = false}
