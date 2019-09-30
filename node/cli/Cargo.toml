@@ -43,6 +43,7 @@ contracts = { package = "srml-contracts", git = 'https://github.com/paritytech/s
 system = { package = "srml-system", git = 'https://github.com/paritytech/substrate.git' }
 balances = { package = "srml-balances", git = 'https://github.com/paritytech/substrate.git' }
 chain-spec = { package = "substrate-chain-spec", git = 'https://github.com/paritytech/substrate.git' }
+im_online = { package = "srml-im-online", git = 'https://github.com/paritytech/substrate.git', default-features = false }
 
 substrate-executor = { git = 'https://github.com/paritytech/substrate.git' }
 

@@ -27,6 +27,7 @@ use node_runtime::{
 
 use babe_primitives::{AuthorityId as BabeId};
 use grandpa_primitives::{AuthorityId as GrandpaId};
+use im_online::sr25519::{AuthorityId as ImOnlineId};
 
 use substrate_service;
 use substrate_service::Properties;
@@ -39,10 +40,21 @@ use sr_primitives::Perbill;
 use serde_json::Number;
 use serde_json::de::ParserNumber;
 
+pub use node_runtime::{AccountId, Balance, GenesisConfig};
+
+pub const NANO: Balance = 1;
+pub const MICRO: Balance = 1_000 * NANO;
+pub const MILLI: Balance = 1_000 * MICRO;
+pub const COIN: Balance = 1_000 * MILLI;
+
 const STAGING_TELEMETRY_URL: &str = "wss://telemetry.polkadot.io/submit/";
 
 /// Specialized `ChainSpec`.
 pub type ChainSpec = substrate_service::ChainSpec<GenesisConfig>;
+
+fn session_keys(grandpa: GrandpaId, babe: BabeId, im_online: ImOnlineId) -> SessionKeys {
+	SessionKeys { grandpa, babe, im_online, }
+}
 
 /// Helper function to generate a crypto pair from seed
 pub fn get_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pair>::Public {
@@ -53,11 +65,11 @@ pub fn get_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pair>::Pu
 
 /// Flaming Fir testnet generator
 pub fn flaming_fir_config() -> Result<ChainSpec, String> {
-	ChainSpec::from_json_bytes(include_bytes!("../res/flaming-fir.json"))
+	ChainSpec::from_json_bytes(&include_bytes!("../res/flaming-fir.json")[..])
 }
 
 pub fn crayfish_fir_config() -> Result<ChainSpec, String> {
-	ChainSpec::from_json_bytes(include_bytes!("../res/crayfish-fir.json"))
+	ChainSpec::from_json_bytes(&include_bytes!("../res/crayfish-fir.json")[..])
 }
 
 fn staging_testnet_config_genesis() -> GenesisConfig {
@@ -67,7 +79,7 @@ fn staging_testnet_config_genesis() -> GenesisConfig {
 	// and
 	// for i in 1 2 3 4 ; do for j in session; do subkey --ed25519 inspect "$secret"//fir//$j//$i; done; done
 
-	let initial_authorities: Vec<(AccountId, AccountId, AuraId, GrandpaId)> = vec![
+	let initial_authorities: Vec<(AccountId, AccountId, GrandpaId, BabeId, ImOnlineId)> = vec![
 		(
 			// 5Fbsd6WXDGiLTxunqeK5BATNiocfCqu9bS1yArVjCgeBLkVy
 			hex!["9c7a2ee14e565db0c69f78c7b4cd839fbf52b607d867e9e9c5a79042898a0d12"].unchecked_into(),
@@ -76,6 +88,8 @@ fn staging_testnet_config_genesis() -> GenesisConfig {
 			// 5Fb9ayurnxnaXj56CjmyQLBiadfRCqUbL2VWNbbe1nZU6wiC
 			hex!["9becad03e6dcac03cee07edebca5475314861492cdfc96a2144a67bbe9699332"].unchecked_into(),
 			// 5Fb9ayurnxnaXj56CjmyQLBiadfRCqUbL2VWNbbe1nZU6wiC
+			hex!["9becad03e6dcac03cee07edebca5475314861492cdfc96a2144a67bbe9699332"].unchecked_into(),
+
 			hex!["9becad03e6dcac03cee07edebca5475314861492cdfc96a2144a67bbe9699332"].unchecked_into(),
 		),
 		(
@@ -87,6 +101,7 @@ fn staging_testnet_config_genesis() -> GenesisConfig {
 			hex!["7932cff431e748892fa48e10c63c17d30f80ca42e4de3921e641249cd7fa3c2f"].unchecked_into(),
 			// 5EockCXN6YkiNCDjpqqnbcqd4ad35nU4RmA1ikM4YeRN4WcE
 			hex!["7932cff431e748892fa48e10c63c17d30f80ca42e4de3921e641249cd7fa3c2f"].unchecked_into(),
+			hex!["7932cff431e748892fa48e10c63c17d30f80ca42e4de3921e641249cd7fa3c2f"].unchecked_into(),
 		),
 		(
 			// 5DyVtKWPidondEu8iHZgi6Ffv9yrJJ1NDNLom3X9cTDi98qp
@@ -97,6 +112,7 @@ fn staging_testnet_config_genesis() -> GenesisConfig {
 			hex!["5633b70b80a6c8bb16270f82cca6d56b27ed7b76c8fd5af2986a25a4788ce440"].unchecked_into(),
 			// 5E1jLYfLdUQKrFrtqoKgFrRvxM3oQPMbf6DfcsrugZZ5Bn8d
 			hex!["5633b70b80a6c8bb16270f82cca6d56b27ed7b76c8fd5af2986a25a4788ce440"].unchecked_into(),
+			hex!["5633b70b80a6c8bb16270f82cca6d56b27ed7b76c8fd5af2986a25a4788ce440"].unchecked_into(),
 		),
 		(
 			// 5HYZnKWe5FVZQ33ZRJK1rG3WaLMztxWrrNDb1JRwaHHVWyP9
@@ -106,6 +122,7 @@ fn staging_testnet_config_genesis() -> GenesisConfig {
 			// 5DMa31Hd5u1dwoRKgC4uvqyrdK45RHv3CpwvpUC1EzuwDit4
 			hex!["3919132b851ef0fd2dae42a7e734fe547af5a6b809006100f48944d7fae8e8ef"].unchecked_into(),
 			// 5DMa31Hd5u1dwoRKgC4uvqyrdK45RHv3CpwvpUC1EzuwDit4
+			hex!["3919132b851ef0fd2dae42a7e734fe547af5a6b809006100f48944d7fae8e8ef"].unchecked_into(),
 			hex!["3919132b851ef0fd2dae42a7e734fe547af5a6b809006100f48944d7fae8e8ef"].unchecked_into(),
 		),
 	];
@@ -150,10 +167,10 @@ fn staging_testnet_config_genesis() -> GenesisConfig {
 				.collect::<Vec<_>>(),
 		}),
 		session: Some(SessionConfig {
-//			validators: initial_authorities.iter().map(|x| x.1.clone()).collect(),
+//			validators: initial_authorities.iter().map(|x| （x.1.clone(), STASH)).collect(),
 			keys: initial_authorities
 				.iter()
-				.map(|x| (x.1.clone(), SessionKeys(x.2.clone(), x.2.clone())))
+				.map(|x| (x.1.clone(), session_keys(x.2.clone(), x.3.clone(), x.4.clone())))
 				.collect::<Vec<_>>(),
 		}),
 		ostaking: Some(StakingConfig {
@@ -179,10 +196,16 @@ fn staging_testnet_config_genesis() -> GenesisConfig {
 			key: endowed_accounts[0].clone(),
 		}),
 		babe: Some(BabeConfig {
-			authorities: initial_authorities.iter().map(|x| x.2.clone()).collect(),
+			authorities: initial_authorities.iter().map(|x| (x.3.clone(), 1u64)).collect(),
+		}),
+		im_online: Some(ImOnlineConfig {
+			keys: vec![],
+		}),
+		authority_discovery: Some(AuthorityDiscoveryConfig{
+			keys: vec![],
 		}),
 		grandpa: Some(GrandpaConfig {
-			authorities: initial_authorities.iter().map(|x| (x.3.clone(), 1)).collect(),
+			authorities: initial_authorities.iter().map(|x| (x.2.clone(), 1u64)).collect(),
 		}),
 	}
 }
@@ -215,25 +238,25 @@ pub fn get_authority_keys_from_seed(seed: &str) -> (AccountId, AccountId, Grandp
 
 /// Helper function to create GenesisConfig for testing
 pub fn testnet_genesis(
-	initial_authorities: Vec<(AccountId, AccountId, AuraId, GrandpaId)>,
+	initial_authorities: Vec<(AccountId, AccountId, GrandpaId, BabeId, ImOnlineId)>,
 	root_key: AccountId,
 	endowed_accounts: Option<Vec<AccountId>>,
 	enable_println: bool,
 ) -> GenesisConfig {
 	let endowed_accounts: Vec<AccountId> = endowed_accounts.unwrap_or_else(|| {
 		vec![
-			get_account_id_from_seed("Alice"),
-			get_account_id_from_seed("Bob"),
-			get_account_id_from_seed("Charlie"),
-			get_account_id_from_seed("Dave"),
-			get_account_id_from_seed("Eve"),
-			get_account_id_from_seed("Ferdie"),
-			get_account_id_from_seed("Alice//stash"),
-			get_account_id_from_seed("Bob//stash"),
-			get_account_id_from_seed("Charlie//stash"),
-			get_account_id_from_seed("Dave//stash"),
-			get_account_id_from_seed("Eve//stash"),
-			get_account_id_from_seed("Ferdie//stash"),
+			get_from_seed::<AccountId>("Alice"),
+			get_from_seed::<AccountId>("Bob"),
+			get_from_seed::<AccountId>("Charlie"),
+			get_from_seed::<AccountId>("Dave"),
+			get_from_seed::<AccountId>("Eve"),
+			get_from_seed::<AccountId>("Ferdie"),
+			get_from_seed::<AccountId>("Alice//stash"),
+			get_from_seed::<AccountId>("Bob//stash"),
+			get_from_seed::<AccountId>("Charlie//stash"),
+			get_from_seed::<AccountId>("Dave//stash"),
+			get_from_seed::<AccountId>("Eve//stash"),
+			get_from_seed::<AccountId>("Ferdie//stash"),
 		]
 	});
 
@@ -265,7 +288,7 @@ pub fn testnet_genesis(
 //			validators: initial_authorities.iter().map(|x| x.1.clone()).collect(),
 			keys: initial_authorities
 				.iter()
-				.map(|x| (x.1.clone(), SessionKeys(x.2.clone(), x.2.clone())))
+				.map(|x| (x.1.clone(), session_keys(x.2.clone(), x.3.clone(), x.4.clone())))
 				.collect::<Vec<_>>(),
 		}),
 		ostaking: Some(StakingConfig {
@@ -290,10 +313,16 @@ pub fn testnet_genesis(
 //		}),
 		sudo: Some(SudoConfig { key: root_key }),
 		babe: Some(BabeConfig {
-			authorities: initial_authorities.iter().map(|x| x.2.clone()).collect(),
+			authorities: initial_authorities.iter().map(|x| (x.3.clone(), 1u64)).collect(),
+		}),
+		im_online: Some(ImOnlineConfig {
+			keys: vec![],
+		}),
+		authority_discovery: Some(AuthorityDiscoveryConfig{
+			keys: vec![],
 		}),
 		grandpa: Some(GrandpaConfig {
-			authorities: initial_authorities.iter().map(|x| (x.3.clone(), 1)).collect(),
+			authorities: initial_authorities.iter().map(|x| (x.2.clone(), 1u64)).collect(),
 		}),
 	}
 }
@@ -301,7 +330,7 @@ pub fn testnet_genesis(
 fn development_config_genesis() -> GenesisConfig {
 	testnet_genesis(
 		vec![get_authority_keys_from_seed("Alice")],
-		get_account_id_from_seed("Alice"),
+		get_from_seed::<AccountId>("Alice"),
 		None,
 		true,
 	)
@@ -321,7 +350,7 @@ fn crayfish_config_genesis() -> GenesisConfig {
 
 /// Helper function to create GenesisConfig for testing
 pub fn crayfish_testnet_genesis(
-	initial_authorities: Vec<(AccountId, AccountId, AuraId, GrandpaId)>,
+	initial_authorities: Vec<(AccountId, AccountId, GrandpaId, BabeId, ImOnlineId)>,
 	root_key: AccountId,
 	endowed_accounts: Option<Vec<AccountId>>,
 	enable_println: bool,
@@ -371,7 +400,7 @@ pub fn crayfish_testnet_genesis(
 //			validators: initial_authorities.iter().map(|x| x.1.clone()).collect(),
 			keys: initial_authorities
 				.iter()
-				.map(|x| (x.1.clone(), SessionKeys(x.2.clone(), x.2.clone())))
+				.map(|x| (x.1.clone(), session_keys(x.2.clone(), x.3.clone(), x.4.clone())))
 				.collect::<Vec<_>>(),
 		}),
 		ostaking: Some(StakingConfig {
@@ -395,10 +424,16 @@ pub fn crayfish_testnet_genesis(
 //		}),
 		sudo: Some(SudoConfig { key: root_key }),
 		babe: Some(BabeConfig {
-			authorities: initial_authorities.iter().map(|x| x.2.clone()).collect(),
+			authorities: initial_authorities.iter().map(|x| (x.3.clone(), 1u64)).collect(),
+		}),
+		im_online: Some(ImOnlineConfig {
+			keys: vec![],
+		}),
+		authority_discovery: Some(AuthorityDiscoveryConfig{
+			keys: vec![],
 		}),
 		grandpa: Some(GrandpaConfig {
-			authorities: initial_authorities.iter().map(|x| (x.3.clone(), 1)).collect(),
+			authorities: initial_authorities.iter().map(|x| (x.2.clone(), 1u64)).collect(),
 		}),
 	}
 }
@@ -423,7 +458,7 @@ fn local_testnet_genesis() -> GenesisConfig {
 			get_authority_keys_from_seed("Alice"),
 			get_authority_keys_from_seed("Bob"),
 		],
-		get_account_id_from_seed("Alice"),
+		get_from_seed::<AccountId>("Alice"),
 		None,
 		false,
 	)
@@ -486,7 +521,7 @@ pub(crate) mod tests {
 	fn local_testnet_genesis_instant_single() -> GenesisConfig {
 		let mut genesis = testnet_genesis(
 			vec![get_authority_keys_from_seed("Alice")],
-			get_account_id_from_seed("Alice"),
+			get_from_seed::<AccountId>("Alice"),
 			None,
 			false,
 		);

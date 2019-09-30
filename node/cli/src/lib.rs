@@ -166,6 +166,8 @@ where
 	T: Into<std::ffi::OsString> + Clone,
 	E: IntoExit,
 {
+	type Config<A, B> = Configuration<(), A, B>;
+
 	match parse_and_prepare::<CustomSubcommands, NoCustom, _>(&version, "substrate-node", args) {
 		ParseAndPrepare::Run(cmd) => cmd.run(load_spec, exit,
 			 |exit, _cli_args, _custom_args, config: Config<_, _>| {
